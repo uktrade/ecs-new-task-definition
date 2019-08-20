@@ -37,6 +37,5 @@ aws ecs register-task-definition \
 	--requires-compatibilities "${REQUIRES_COMPATIBILITIES}" \
 	--volumes "${VOLUMES}"
 
-aws ecs deregister-task-definition \
-	--task-definition $TASK_DEFINITION_ARN \
-	--region eu-west-2
+# We don't deregister the old task defintion, so Terraform still sees
+# the old one and doesn't try to recreate
