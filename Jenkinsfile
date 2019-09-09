@@ -1,32 +1,53 @@
 pipeline {
+
   agent {
-    node {
-      label env.CI_SLAVE
+    kubernetes {
+      defaultContainer 'jnlp'
+      yaml """
+apiVersion: v1
+kind: Pod
+metadata:
+  labels:
+    job: ${env.JOB_NAME}
+    job_id: ${env.BUILD_NUMBER}
+spec:
+  nodeSelector:
+    role: worker
+  containers:
+  - name: ecs-new-task-definition
+    image: quay.io/uktrade/ecs-new-task-definition
+    imagePullPolicy: Always
+    command:
+    - cat
+    tty: true
+"""
     }
   }
 
   options {
     timestamps()
     ansiColor('xterm')
+    buildDiscarder(logRotator(daysToKeepStr: '180'))
   }
 
   stages {
     stage('Init') {
       steps {
         script {
-          validateDeclarativePipeline("${env.WORKSPACE}/Jenkinsfile")
-          deployer = docker.image("quay.io/uktrade/ecs-new-task-definition:${env.GIT_BRANCH.split("/")[1]}")
-          deployer.pull()
-          docker_args = "--network host"
+          timestamps {
+            validateDeclarativePipeline("${env.WORKSPACE}/Jenkinsfile")
+          }
         }
       }
     }
     stage('Deploy') {
       steps {
-        script {
-          deployer.inside(docker_args) {
-            withCredentials([[$class: 'AmazonWebServicesCredentialsBinding', credentialsId: env.CredentialsId]]) {
-              sh "./new-task-definition.sh"
+        container('ecs-new-task-definition') {
+          script {
+            timestamps {
+              withCredentials([[$class: 'AmazonWebServicesCredentialsBinding', credentialsId: env.CredentialsId]]) {
+                sh "./new-task-definition.sh"
+              }
             }
           }
         }
